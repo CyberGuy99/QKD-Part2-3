@@ -1,10 +1,13 @@
 from src.aliceServer import AliceServer
 from src.utils import randomBits, Photon
+import random
 
 class Alice(AliceServer):
 
     def protocol(self):
+        NUM_PHOTONS = 8
 
+        '''
         # make a string of random bits like "10110"
         bits = randomBits(10)
 
@@ -26,6 +29,42 @@ class Alice(AliceServer):
         # receive some data from bob
         bob_data = self.recvClassical()
 
+        '''
+
+        # randomly select photons
+        photons = [Photon() for i in range(NUM_PHOTONS)]
+        gates = []
+        for p in photons:
+            choice = random.choice("HVDA")
+            if choice == "H":
+                gates.append("HV")
+                p.prepH()
+            elif choice == "V":
+                p.prepV()
+                gates.append("HV")
+            elif choice == "D":
+                p.prepD()
+                gates.append("DA")
+            elif choice == "A":
+                p.prepA()
+                gates.append("DA")
+            else:
+                raise Exception
+
+        # send photons
+        for p in photons:
+            self.sendPhoton(p)
+
+        bob_measurements = self.recvClassical()
+        
+        # alice announces his measurements
+        encode = lambda g: 0 if g in "HV" else 1
+        encodedGates = [str(encode(g)) for g in gates]
+        encodedGates = "".join(encodedGates)
+        self.sendClassical(encodedGates)
+
+        agree = [bob_measurements[i]  for i in range(NUM_PHOTONS) if bob_measurements[i] == encodedGates[i]]
+        print agree
         protocol_succeeded = True
 
         if protocol_succeeded:
