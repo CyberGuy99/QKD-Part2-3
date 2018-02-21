@@ -6,7 +6,7 @@ import random
 class Bob(BobClient):
 
     def protocol(self):
-        NUM_PHOTONS = 300 
+        NUM_PHOTONS = 300
 
         '''
         # receive stuff from alice
@@ -58,7 +58,7 @@ class Bob(BobClient):
                     photons[i*3+p_i].filterA()
                     measurements_temp.append(photons[i*3+p_i].detect())
                 measurements.append(max(set(measurements_temp), key=measurements_temp.count))
-        
+
         # bob announces his measurements
         encode = lambda g: 0 if g == "HV" else 1
         encodedGates = [str(encode(g)) for g in gates]
@@ -69,7 +69,16 @@ class Bob(BobClient):
         alice_measurements = self.recvClassical()
 
         agree = [measurements[i] for i in range(NUM_PHOTONS/3) if alice_measurements[i] == encodedGates[i] ]
-        print agree
+        #print agree
+        alice_agree = self.recvClassical()
+        bob_agree = ("".join([a for a in agree]))
+
+        #compare agrees
+        count = 0
+        for i in range(NUM_PHOTONS/3):
+           if(alice_agree[i]==bob_agree[i]):
+            count+=1
+        print count
 
         success = True
 
