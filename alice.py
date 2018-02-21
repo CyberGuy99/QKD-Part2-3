@@ -85,7 +85,9 @@ class Alice(AliceServer):
 
         agree = [sent_bits[i]  for i in range(NUM_PHOTONS/3) if bob_measurements[i] == encodedGates[i]]
 
-        print agree
+        self.sendClassical("".join(agree));
+
+        #print agree
         protocol_succeeded = True
 
         if protocol_succeeded:
