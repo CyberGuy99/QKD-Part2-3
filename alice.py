@@ -6,7 +6,8 @@ import random
 class Alice(AliceServer):
 
     def protocol(self):
-        NUM_PHOTONS = 300
+        NUM_PHOTONS = 600
+        threshold = 0.94
 
         '''
         # make a string of random bits like "10110"
@@ -85,7 +86,14 @@ class Alice(AliceServer):
 
         agree = [sent_bits[i]  for i in range(NUM_PHOTONS/3) if bob_measurements[i] == encodedGates[i]]
 
-        self.sendClassical("".join(agree));
+        self.sendClassical("".join(map(str,agree[:int(len(agree)*0.3)])));
+
+
+        # check if bob detected an error
+        if (self.recvClassical() == "0"):
+            return ""
+        else:
+            return "".join(map(str,agree)[int(len(agree)*0.3):])
 
         #print agree
         protocol_succeeded = True

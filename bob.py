@@ -6,7 +6,8 @@ import random
 class Bob(BobClient):
 
     def protocol(self):
-        NUM_PHOTONS = 300
+        NUM_PHOTONS = 600
+        threshold = .94
 
         '''
         # receive stuff from alice
@@ -70,15 +71,27 @@ class Bob(BobClient):
 
         agree = [measurements[i] for i in range(NUM_PHOTONS/3) if alice_measurements[i] == encodedGates[i] ]
         #print agree
-        alice_agree = self.recvClassical()
-        bob_agree = ("".join([a for a in agree]))
+        alice_check = self.recvClassical()
+        bob_agree = ("".join([str(a) for a in agree]))
+        bob_check = bob_agree[:int(len(bob_agree)*0.3)]
+
+        if (len(alice_check) != len(bob_check)):
+            return ""
 
         #compare agrees
         count = 0
-        for i in range(NUM_PHOTONS/3):
-           if(alice_agree[i]==bob_agree[i]):
+        for i in range(len(alice_check)):
+           if(alice_check[i]==bob_check[i]):
             count+=1
-        print count
+
+        hit_rate =  1.0 * count / len(alice_check)
+
+        if hit_rate < threshold:
+            self.sendClassical("0")
+            return ""
+        else:
+            self.sendClassical("1")
+            return bob_agree[int(len(bob_agree)*0.3):]
 
         success = True
 
