@@ -1,11 +1,13 @@
 from src.bobClient import BobClient
 from src.utils import randomBits, Photon
+import src.config
 import random
 
 class Bob(BobClient):
 
     def protocol(self):
-        NUM_PHOTONS = 8 
+        NUM_PHOTONS = 300 
+
         '''
         # receive stuff from alice
         string_of_bits = self.recvClassical()
@@ -28,19 +30,34 @@ class Bob(BobClient):
         self.sendClassical(bob_data)
         '''
 
-        photons = [self.recvPhoton() for i in range(NUM_PHOTONS)]
-        gates = [random.choice(["HV", "DA"]) for i in range(NUM_PHOTONS)]
+        photons = []
+        for i in range(0, NUM_PHOTONS-1, 3):
+            while True:
+                photons_temp = [self.recvPhoton() for i in range(3)]
+                if len(photons_temp) == 3:
+                    photons.extend(photons_temp)
+                    self.sendClassical("1")
+                    break
+                else:
+                    self.sendClassical("0")
+
+        gates = [random.choice(["HV", "DA"]) for i in range(NUM_PHOTONS/3)]
 
         # measure photons
         measurements = []
-        for i in range(NUM_PHOTONS):
+        for i in range(len(gates)):
             if gates[i] == "HV":
-                photons[i].filterH()
-                measurements.append(photons[i].detect())
+                measurements_temp = []
+                for p_i in range(3):
+                    photons[i*3+p_i].filterV()
+                    measurements_temp.append(photons[i*3+p_i].detect())
+                measurements.append(max(set(measurements_temp), key=measurements_temp.count))
             if gates[i] == "DA":
-                photons[i].filterD()
-                measurements.append(photons[i].detect())
-
+                measurements_temp = []
+                for p_i in range(3):
+                    photons[i*3+p_i].filterA()
+                    measurements_temp.append(photons[i*3+p_i].detect())
+                measurements.append(max(set(measurements_temp), key=measurements_temp.count))
         
         # bob announces his measurements
         encode = lambda g: 0 if g == "HV" else 1
@@ -51,7 +68,7 @@ class Bob(BobClient):
         # get alices
         alice_measurements = self.recvClassical()
 
-        agree = [alice_measurements[i] for i in range(NUM_PHOTONS) if alice_measurements[i] == encodedGates[i] ]
+        agree = [measurements[i] for i in range(NUM_PHOTONS/3) if alice_measurements[i] == encodedGates[i] ]
         print agree
 
         success = True
@@ -65,7 +82,7 @@ class Bob(BobClient):
             return ""
 
 if __name__ == "__main__":
-    bobClient = Bob()
+    bobClient = Bob(ip="10.148.228.137")
 #   # to set a default ip address, use this:
     # bobClient = Bob(ip="192.168.1.1")
     bobClient.connect()

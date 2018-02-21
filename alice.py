@@ -1,11 +1,12 @@
 from src.aliceServer import AliceServer
 from src.utils import randomBits, Photon
+import src.config
 import random
 
 class Alice(AliceServer):
 
     def protocol(self):
-        NUM_PHOTONS = 8
+        NUM_PHOTONS = 300
 
         '''
         # make a string of random bits like "10110"
@@ -33,37 +34,57 @@ class Alice(AliceServer):
 
         # randomly select photons
         photons = [Photon() for i in range(NUM_PHOTONS)]
+        sent_bits = []
         gates = []
-        for p in photons:
+        for p_index in range(0,NUM_PHOTONS,3):
             choice = random.choice("HVDA")
             if choice == "H":
-                gates.append("HV")
-                p.prepH()
+                sent_bits.append(0);
+                gates.append("HV") 
+                for i in range(3):
+                    p = photons[p_index+i]
+                    p.prepH()
             elif choice == "V":
-                p.prepV()
-                gates.append("HV")
+                sent_bits.append(1);
+                gates.append("HV") 
+                for i in range(3):
+                    p = photons[p_index+i]
+                    p.prepV()
             elif choice == "D":
-                p.prepD()
-                gates.append("DA")
+                sent_bits.append(0);
+                gates.append("DA") 
+                for i in range(3):
+                    p = photons[p_index+i]
+                    p.prepD()
             elif choice == "A":
-                p.prepA()
-                gates.append("DA")
+                sent_bits.append(1);
+                gates.append("DA") 
+                for i in range(3):
+                    p = photons[p_index+i]
+                    p.prepA()
             else:
                 raise Exception
 
-        # send photons
-        for p in photons:
-            self.sendPhoton(p)
+        # send photons, checking that all are received
+        for p_i in range(0, len(photons), 3):
+            received = "0"
+            while received == "0":
+                self.sendPhoton(photons[p_i])
+                self.sendPhoton(photons[p_i+1])
+                self.sendPhoton(photons[p_i+2])
+                received = self.recvClassical()
 
         bob_measurements = self.recvClassical()
         
-        # alice announces his measurements
+        # alice announces her measurements
+        # 0 for HV, 1 for DA
         encode = lambda g: 0 if g in "HV" else 1
         encodedGates = [str(encode(g)) for g in gates]
         encodedGates = "".join(encodedGates)
         self.sendClassical(encodedGates)
 
-        agree = [bob_measurements[i]  for i in range(NUM_PHOTONS) if bob_measurements[i] == encodedGates[i]]
+        agree = [sent_bits[i]  for i in range(NUM_PHOTONS/3) if bob_measurements[i] == encodedGates[i]]
+
         print agree
         protocol_succeeded = True
 
@@ -79,7 +100,7 @@ class Alice(AliceServer):
 
 
 if __name__ == "__main__":
-    aliceServer = Alice()
+    aliceServer = Alice(ip="10.148.228.137")
     # to set a default ip address, use this:
     # aliceServer = Alice(ip="192.168.1.1")
     aliceServer.connect()
