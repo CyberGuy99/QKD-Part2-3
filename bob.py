@@ -1,110 +1,96 @@
 from src.bobClient import BobClient
 from src.utils import randomBits, Photon
-import src.config
-import random
 
 class Bob(BobClient):
 
     def protocol(self):
-        NUM_PHOTONS = 600
-        threshold = .94
+        num_bits = self.recvClassical()
+        threshold = 0.85
 
-        '''
-        # receive stuff from alice
-        string_of_bits = self.recvClassical()
-        answer_to_life = self.recvClassical()
-        quantum_is_fun = self.recvClassical()
+        bases = ""
+        values = ""
 
-        # receive and process photons
-        photon = self.recvPhoton()
-        split = photon.splitOffV()
-        bit1 = photon.detect()
-        bit2 = split.detect()
+        for i in range(num_bits):
+            photon = self.recvPhoton()
 
-        # Bob can also send photons
-        photon = Photon()
-        photon.prepH()
-        self.sendPhoton(photon)
+            basis = randomBits(1)
+            bases += basis
 
-        # send data to alice
-        bob_data = randomBits(64)
-        self.sendClassical(bob_data)
-        '''
+            # dual detector trick
+            # 00 -> photon lost
+            # 10 -> H/D
+            # 01 -> V/A
+            # 11 -> dark count
 
-        photons = []
-        for i in range(0, NUM_PHOTONS-1, 3):
-            while True:
-                photons_temp = [self.recvPhoton() for i in range(3)]
-                if len(photons_temp) == 3:
-                    photons.extend(photons_temp)
-                    self.sendClassical("1")
-                    break
-                else:
-                    self.sendClassical("0")
+            if basis == "0": split = photon.splitOffH()
+            if basis == "1": split = photon.splitOffD()
 
-        gates = [random.choice(["HV", "DA"]) for i in range(NUM_PHOTONS/3)]
+            meas = split.detect() + photon.detect()
+            if meas == "00": values += randomBits(1)
+            if meas == "10": values += "0"
+            if meas == "01": values += "1"
+            if meas == "11": values += randomBits(1)
 
-        # measure photons
-        measurements = []
-        for i in range(len(gates)):
-            if gates[i] == "HV":
-                measurements_temp = []
-                for p_i in range(3):
-                    photons[i*3+p_i].filterV()
-                    measurements_temp.append(photons[i*3+p_i].detect())
-                measurements.append(max(set(measurements_temp), key=measurements_temp.count))
-            if gates[i] == "DA":
-                measurements_temp = []
-                for p_i in range(3):
-                    photons[i*3+p_i].filterA()
-                    measurements_temp.append(photons[i*3+p_i].detect())
-                measurements.append(max(set(measurements_temp), key=measurements_temp.count))
 
-        # bob announces his measurements
-        encode = lambda g: 0 if g == "HV" else 1
-        encodedGates = [str(encode(g)) for g in gates]
-        encodedGates = "".join(encodedGates)
-        self.sendClassical(encodedGates)
+        good_pos = ""
+        sifted_key = ""
 
-        # get alices
-        alice_measurements = self.recvClassical()
+        # receive pairs of qubits from Alice
+        # one of the two is the one that Alice sent!
+        for i in range(num_bits):
+            pair = self.recvClassical()
+            first = pair[0:2]
+            secnd = pair[2:4]
 
-        agree = [measurements[i] for i in range(NUM_PHOTONS/3) if alice_measurements[i] == encodedGates[i] ]
-        #print agree
-        alice_check = self.recvClassical()
-        bob_agree = ("".join([str(a) for a in agree]))
-        bob_check = bob_agree[:int(len(bob_agree)*0.3)]
+            # try to identify which of the states
+            if first[0] != bases[i]: couldBeFirst = True
+            else: couldBeFirst = first[1] == values[i]
 
-        if (len(alice_check) != len(bob_check)):
-            return ""
+            if secnd[0] != bases[i]: couldBeSecnd = True
+            else: couldBeSecnd = secnd[1] == values[i]
 
-        #compare agrees
-        count = 0
-        for i in range(len(alice_check)):
-           if(alice_check[i]==bob_check[i]):
-            count+=1
+            if couldBeFirst and not couldBeSecnd:
+                good_pos += "1"
+                sifted_key += first[1]
+            if not couldBeFirst and couldBeSecnd:
+                good_pos += "1"
+                sifted_key += secnd[1]
 
-        hit_rate =  1.0 * count / len(alice_check)
+            if couldBeFirst and couldBeSecnd: good_pos += "0"
+            # this can't happen but whatever:
+            if not couldBeFirst and not couldBeSecnd: good_pos += "0"
 
-        if hit_rate < threshold:
-            self.sendClassical("0")
+        sift_len = len(sifted_key)
+
+        # tell Alice which ones were good
+        self.sendClassical(good_pos)
+
+        shareWhich = self.recvClassical()
+        aliceShared = self.recvClassical()
+
+        compareBits = ""
+        keepBits = ""
+        for i in range(sift_len):
+            if shareWhich[i] == "0": keepBits += sifted_key[i]
+            if shareWhich[i] == "1": compareBits += sifted_key[i]
+
+        compareGood = 0
+        for i in range(len(compareBits)):
+            if compareBits[i] == aliceShared[i]: compareGood += 1
+
+        if len(compareBits) == 0: fractionGood = 0
+        else: fractionGood = float(compareGood) / float(len(compareBits))
+        print("Fraction good: " + str(fractionGood))
+
+        if fractionGood < threshold:
+            self.sendClassical("abort")
             return ""
         else:
-            self.sendClassical("1")
-            return bob_agree[int(len(bob_agree)*0.3):]
-
-        success = True
-
-        if success:
-            # return the string of the same
-            # length as Alice's
-            return "100011"
-        else:
-            # abort
-            return ""
+            self.sendClassical("good")
+            return keepBits
 
 if __name__ == "__main__":
-    bobClient = Bob(ip="10.148.228.137")
+    bobClient = Bob()
 #   # to set a default ip address, use this:
     # bobClient = Bob(ip="192.168.1.1")
     bobClient.connect()
