@@ -23,9 +23,9 @@ class Eve(EveClient):
             cantBeFirst = False
             cantBeSecond = False
 
-            if first[1] == 1:
+            if first[1] == "1":
                 cantBeFirst = True
-            if second[1] == 0:
+            if second[1] == "0":
                 cantBeSecond = True
 
             if cantBeFirst and not cantBeSecond:
