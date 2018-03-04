@@ -8,11 +8,35 @@ class Eve(EveClient):
 
         num_bits = self.recvClassicalAlice()
 
+        bases = ""
+        values = ""
+
+        # try to guess some additional w/o setting off the alarm
         for i in range(num_bits):
             photon = self.recvPhotonAlice()
+
+            basis = randomBits(1)
+            bases += basis
+
+            # dual detector trick
+            # 00 -> photon lost
+            # 10 -> H/D
+            # 01 -> V/A
+            # 11 -> dark count
+
+            if basis == "0": split = photon.splitOffH()
+            if basis == "1": split = photon.splitOffD()
+
+            meas = split.detect() + photon.detect()
+            if meas == "00": values += randomBits(1)
+            if meas == "10": values += "0"
+            if meas == "01": values += "1"
+            if meas == "11": values += randomBits(1)
+
             self.sendPhotonBob(photon)
 
         guess_key = ""
+
         # where alice announces her pairs
         # try to identify which is correct
         for i in range(num_bits):
@@ -20,6 +44,7 @@ class Eve(EveClient):
             first = pair[0:2]
             second = pair[2:4]
 
+            # used for bug exploitation
             cantBeFirst = False
             cantBeSecond = False
 
@@ -28,17 +53,34 @@ class Eve(EveClient):
             if second[1] == "0":
                 cantBeSecond = True
 
+            # mirroring bob's implementation 
+            # of reading qubits
+
+            # try to identify which of the states
+            if first[0] != bases[i]: couldBeFirst = True
+            else: couldBeFirst = first[1] == values[i]
+
+            if second[0] != bases[i]: couldBeSecnd = True
+            else: couldBeSecnd = second[1] == values[i]
+
+            # first use 
             if cantBeFirst and not cantBeSecond:
                 guess_key += second[1]
             elif cantBeSecond and not cantBeFirst:
                 guess_key += first[1]
+            elif couldBeFirst and not couldBeSecnd:
+                guess_key += first[1]
+            elif not couldBeFirst and couldBeSecnd:
+                guess_key += second[1]
             else:
                 guess_key += randomBits(1)
 
+        # create sifted key from bob's response
         good_pos = self.recvClassicalBob()
         sifted_key = "".join([guess_key[i] for i in range(num_bits) if good_pos[i] == "1"])
 
 
+        # remove bits used for comparison
         shareWhich = self.recvClassicalAlice()
         aliceShared = self.recvClassicalAlice()
 

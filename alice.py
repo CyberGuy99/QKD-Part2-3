@@ -59,12 +59,12 @@ class Alice(AliceServer):
 
         # Bob decides if we abort
         abort = self.recvClassical()
-        if abort == "abort": return ""
+        #if abort == "abort": return ""
         return keepBits
 
 
 if __name__ == "__main__":
     aliceServer = Alice()
     # to set a default ip address, use this:
-    # aliceServer = Alice(ip="192.168.1.1")
+    #aliceServer = Alice(ip="192.168.1.1")
     aliceServer.connect()
