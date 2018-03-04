@@ -8,32 +8,45 @@ class Eve(EveClient):
 
         num_bits = self.recvClassicalAlice()
 
+        # how many bits should we look at to remain undetected
+        threshold = 0.20
+
         bases = ""
         values = ""
 
+        should_look = [True if random.random() < threshold 
+                        else False for i in range(num_bits)]
+
         # try to guess some additional w/o setting off the alarm
         for i in range(num_bits):
-            photon = self.recvPhotonAlice()
+            if should_look[i]:
+                photon = self.recvPhotonAlice()
 
-            basis = randomBits(1)
-            bases += basis
+                basis = randomBits(1)
+                bases += basis
 
-            # dual detector trick
-            # 00 -> photon lost
-            # 10 -> H/D
-            # 01 -> V/A
-            # 11 -> dark count
+                # dual detector trick
+                # 00 -> photon lost
+                # 10 -> H/D
+                # 01 -> V/A
+                # 11 -> dark count
 
-            if basis == "0": split = photon.splitOffH()
-            if basis == "1": split = photon.splitOffD()
+                if basis == "0": split = photon.splitOffH()
+                if basis == "1": split = photon.splitOffD()
 
-            meas = split.detect() + photon.detect()
-            if meas == "00": values += randomBits(1)
-            if meas == "10": values += "0"
-            if meas == "01": values += "1"
-            if meas == "11": values += randomBits(1)
+                meas = split.detect() + photon.detect()
+                if meas == "00": values += randomBits(1)
+                if meas == "10": values += "0"
+                if meas == "01": values += "1"
+                if meas == "11": values += randomBits(1)
 
-            self.sendPhotonBob(photon)
+                self.sendPhotonBob(photon)
+            else:
+                photon = self.recvPhotonAlice()
+                self.sendPhotonBob(photon)
+                bases += "0"
+                values += "0"
+
 
         guess_key = ""
 
@@ -55,22 +68,22 @@ class Eve(EveClient):
 
             # mirroring bob's implementation 
             # of reading qubits
-
-            # try to identify which of the states
-            if first[0] != bases[i]: couldBeFirst = True
+            if should_look[i] and first[0] != bases[i]: couldBeFirst = True
             else: couldBeFirst = first[1] == values[i]
 
-            if second[0] != bases[i]: couldBeSecnd = True
+            if should_look[i] and second[0] != bases[i]: couldBeSecnd = True
             else: couldBeSecnd = second[1] == values[i]
 
-            # first use 
+            # first try to use exploit
+            # then try to use measurement if measurement exists
+            # if all fails, random bit
             if cantBeFirst and not cantBeSecond:
                 guess_key += second[1]
             elif cantBeSecond and not cantBeFirst:
                 guess_key += first[1]
-            elif couldBeFirst and not couldBeSecnd:
+            elif should_look[i] and couldBeFirst and not couldBeSecnd:
                 guess_key += first[1]
-            elif not couldBeFirst and couldBeSecnd:
+            elif should_look[i] and not couldBeFirst and couldBeSecnd:
                 guess_key += second[1]
             else:
                 guess_key += randomBits(1)
@@ -126,7 +139,7 @@ class Eve(EveClient):
         return keepBits
 
 if __name__ == "__main__":
-    eveClient = Eve()
+    eveClient = Eve(ip='10.147.228.138')
     # to set a default ip address, use this:
     # eveClient = Eve(ip="192.168.1.1")
     eveClient.connect()

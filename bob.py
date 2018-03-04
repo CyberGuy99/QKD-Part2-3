@@ -82,18 +82,15 @@ class Bob(BobClient):
         else: fractionGood = float(compareGood) / float(len(compareBits))
         print("Fraction good: " + str(fractionGood))
 
-        '''
         if fractionGood < threshold:
             self.sendClassical("abort")
             return ""
         else:
             self.sendClassical("good")
             return keepBits
-        '''
-        return keepBits
 
 if __name__ == "__main__":
-    bobClient = Bob()
+    bobClient = Bob(ip='10.147.228.138')
 #   # to set a default ip address, use this:
     # bobClient = Bob(ip="192.168.1.1")
     bobClient.connect()
