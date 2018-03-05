@@ -9,7 +9,7 @@ class Eve(EveClient):
         num_bits = self.recvClassicalAlice()
 
         # how many bits should we look at to remain undetected
-        threshold = 0.20
+        threshold = 0.15
 
         bases = ""
         values = ""
